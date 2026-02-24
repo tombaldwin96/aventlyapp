@@ -9,7 +9,7 @@ export default function AppTabsLayout() {
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
-        headerStyle: { backgroundColor: colors.primaryDark },
+        headerStyle: { backgroundColor: colors.headerBg ?? colors.primaryDark },
         headerTintColor: colors.primaryForeground,
         headerTitleStyle: { fontWeight: '600', fontSize: 18 },
       }}

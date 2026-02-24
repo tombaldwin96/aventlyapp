@@ -19,8 +19,8 @@ function TabBar() {
       {TABS.map((tab) => {
         const isActive =
           tab.pathMatch === '/performer'
-            ? !pathname.includes('bookings') && !pathname.includes('messages') && !pathname.includes('account')
-            : pathname.includes(tab.pathMatch);
+            ? !pathname.includes('bookings') && !pathname.includes('booking-detail') && !pathname.includes('messages') && !pathname.includes('conversation') && !pathname.includes('account') && !pathname.includes('profile')
+            : pathname.includes(tab.pathMatch) || (tab.pathMatch === '/performer/bookings' && pathname.includes('booking-detail')) || (tab.pathMatch === '/performer/messages' && pathname.includes('conversation'));
         return (
           <TouchableOpacity
             key={tab.path}
@@ -45,8 +45,11 @@ export default function PerformerLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="bookings" />
+        <Stack.Screen name="booking-detail" />
         <Stack.Screen name="messages" />
+        <Stack.Screen name="conversation" />
         <Stack.Screen name="account" />
+        <Stack.Screen name="profile" />
       </Stack>
       <TabBar />
     </View>

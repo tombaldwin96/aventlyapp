@@ -16,6 +16,21 @@ export async function getAccessToken(): Promise<string | null> {
   return session?.access_token ?? null;
 }
 
+/** Public GET (no auth). For taxonomy, search, etc. */
+export async function fetchPublic<T>(path: string): Promise<{ data?: T; error?: string }> {
+  const base = getApiBaseUrl();
+  if (!base) return { error: 'API URL not configured' };
+  const url = path.startsWith('http') ? path : `${base}${path.startsWith('/') ? '' : '/'}${path}`;
+  try {
+    const res = await fetch(url);
+    const data = await res.json().catch(() => null);
+    if (!res.ok) return { error: (data as { error?: string })?.error ?? 'Request failed' };
+    return { data: data as T };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Network error' };
+  }
+}
+
 /** Fetch from the Avently web API with current Supabase access token. */
 export async function apiFetch<T>(
   path: string,

@@ -7,10 +7,10 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch } from '@/lib/api';
 import type { DashboardData } from '@/lib/types';
@@ -49,12 +49,8 @@ const BOOKING_STATUS_LABEL: Record<string, string> = {
   DISPUTED: 'Disputed',
 };
 
-function getWebDashboardUrl(path: string): string {
-  const base = process.env.EXPO_PUBLIC_APP_URL?.replace(/\/$/, '') ?? 'https://avently.co.uk';
-  return `${base}/dashboard${path}`;
-}
-
 export default function PerformerDashboard() {
+  const router = useRouter();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const [data, setData] = React.useState<DashboardData | null>(null);
@@ -148,7 +144,7 @@ export default function PerformerDashboard() {
       {data && data.pendingBookingCount > 0 && (
         <TouchableOpacity
           style={styles.bookingRequestCard}
-          onPress={() => Linking.openURL(getWebDashboardUrl('/bookings'))}
+          onPress={() => router.push('/(app)/performer/bookings')}
           activeOpacity={0.8}
         >
           <Text style={styles.bookingRequestTitle}>New booking request{data.pendingBookingCount === 1 ? '' : 's'}</Text>
@@ -210,7 +206,7 @@ export default function PerformerDashboard() {
             </View>
             <TouchableOpacity
               style={styles.editProfileBtn}
-              onPress={() => Linking.openURL(getWebDashboardUrl('/profile'))}
+              onPress={() => router.push('/(app)/performer/profile')}
               activeOpacity={0.8}
             >
               <Text style={styles.editProfileBtnText}>Edit profile</Text>
@@ -225,7 +221,7 @@ export default function PerformerDashboard() {
         <View style={styles.quickActions}>
           <TouchableOpacity
             style={styles.quickActionCard}
-            onPress={() => Linking.openURL(getWebDashboardUrl('/account'))}
+            onPress={() => router.push('/(app)/performer/account')}
             activeOpacity={0.8}
           >
             <Text style={styles.quickActionIcon}>⚙</Text>
@@ -234,7 +230,7 @@ export default function PerformerDashboard() {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.quickActionCard}
-            onPress={() => Linking.openURL(getWebDashboardUrl('/messages'))}
+            onPress={() => router.push('/(app)/performer/messages')}
             activeOpacity={0.8}
           >
             <Text style={styles.quickActionIcon}>💬</Text>
@@ -248,7 +244,7 @@ export default function PerformerDashboard() {
       <View style={styles.section}>
         <View style={styles.sectionRow}>
           <Text style={styles.sectionTitle}>Recent bookings</Text>
-          <TouchableOpacity onPress={() => Linking.openURL(getWebDashboardUrl('/bookings'))}>
+          <TouchableOpacity onPress={() => router.push('/(app)/performer/bookings')}>
             <Text style={styles.viewAll}>View all</Text>
           </TouchableOpacity>
         </View>
@@ -263,7 +259,7 @@ export default function PerformerDashboard() {
               <TouchableOpacity
                 key={b.id}
                 style={styles.bookingRow}
-                onPress={() => Linking.openURL(getWebDashboardUrl(`/bookings/${b.id}`))}
+                onPress={() => router.push({ pathname: '/(app)/performer/booking-detail', params: { id: b.id } } as any)}
                 activeOpacity={0.7}
               >
                 <View style={styles.bookingRowMain}>

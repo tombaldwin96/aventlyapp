@@ -1,12 +1,18 @@
 /**
- * Avently theme: matches website (Booking.com-inspired blue).
- * Primary: hsl(204, 100%, 38%) -> #006BB3
- * Header/dark blue: hsl(211, 100%, 25%) -> #003580
+ * Avently theme: matches website (header blue, primary, amber search bar).
+ * Primary: #006BB3, Header: #003580, Search bar border: #febb02 (website hero search).
  */
 export const colors = {
   primary: '#006BB3',
   primaryDark: '#003580',
   primaryForeground: '#FFFFFF',
+  /** Hero and header background (same as website). */
+  headerBg: '#003580',
+  /** Footer background. */
+  footerBg: '#002855',
+  /** Hero search bar border (website amber). */
+  searchBarBorder: '#febb02',
+  searchBarBorderMuted: '#fcd34d',
   background: '#F7F9FC',
   foreground: '#1E293B',
   card: '#FFFFFF',

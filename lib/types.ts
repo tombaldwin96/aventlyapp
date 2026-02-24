@@ -6,6 +6,7 @@ export interface AppUser {
   email: string;
   role: UserRole;
   name: string;
+  phone?: string | null;
   status: string;
   endUserProfile?: { id: string } | null;
   businessProfile?: { id: string } | null;
