@@ -48,6 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (mounted.current) setUser(profile);
   }, []);
 
+  // Restore session from persistent storage (SecureStore/AsyncStorage). User stays logged in until they sign out.
   useEffect(() => {
     mounted.current = true;
     let cancelled = false;
@@ -77,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [fetchProfile]);
 
+  // Only clear user on explicit SIGNED_OUT (e.g. user tapped Sign out). Token refresh keeps session alive.
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT') {

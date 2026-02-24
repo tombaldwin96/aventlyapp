@@ -1,6 +1,7 @@
 import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? 'https://placeholder.supabase.co';
@@ -20,7 +21,9 @@ function getWebStorage(): Storage | null {
   return null;
 }
 
-/** Storage: AsyncStorage on native; localStorage on web; in-memory fallback if either fails. */
+const isNative = Platform.OS === 'ios' || Platform.OS === 'android';
+
+/** Storage: SecureStore (native) with AsyncStorage fallback; localStorage on web; in-memory fallback. Keeps user logged in until they sign out. */
 const SupabaseStorageAdapter = {
   getItem: async (key: string): Promise<string | null> => {
     if (Platform.OS === 'web') {
@@ -31,9 +34,20 @@ const SupabaseStorageAdapter = {
         return memoryStore.get(key) ?? null;
       }
     }
+    if (isNative) {
+      try {
+        const fromSecure = await SecureStore.getItemAsync(key);
+        if (fromSecure != null) return fromSecure;
+      } catch {}
+      try {
+        const fromAsync = await AsyncStorage.getItem(key);
+        return fromAsync ?? memoryStore.get(key) ?? null;
+      } catch {
+        return memoryStore.get(key) ?? null;
+      }
+    }
     try {
-      const value = await AsyncStorage.getItem(key);
-      return value ?? memoryStore.get(key) ?? null;
+      return await AsyncStorage.getItem(key) ?? memoryStore.get(key) ?? null;
     } catch {
       return memoryStore.get(key) ?? null;
     }
@@ -50,6 +64,15 @@ const SupabaseStorageAdapter = {
       }
       return;
     }
+    if (isNative) {
+      try {
+        await SecureStore.setItemAsync(key, value);
+        try { await AsyncStorage.setItem(key, value); } catch {}
+        return;
+      } catch (e) {
+        if (__DEV__) console.warn('[Supabase] SecureStore.setItem failed (e.g. size limit), using AsyncStorage:', e);
+      }
+    }
     try {
       await AsyncStorage.setItem(key, value);
     } catch (e) {
@@ -65,6 +88,9 @@ const SupabaseStorageAdapter = {
         if (ls) ls.removeItem(key);
       } catch {}
       return;
+    }
+    if (isNative) {
+      try { await SecureStore.deleteItemAsync(key); } catch {}
     }
     try {
       await AsyncStorage.removeItem(key);
