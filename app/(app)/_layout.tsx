@@ -11,6 +11,7 @@ export default function AppLayout() {
   useEffect(() => {
     if (!user) return;
     const sub = segments[1];
+    if (sub === 'home') return; // Home is the app homepage; allow all roles to stay on it
     let target: string | null = null;
     if (user.role === 'ADMIN') target = '/(app)/admin';
     else if (user.role === 'PERFORMER') target = '/(app)/performer';
@@ -30,6 +31,7 @@ export default function AppLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="home" />
       <Stack.Screen name="admin" />
       <Stack.Screen name="performer" />
       <Stack.Screen name="business" />

@@ -1,9 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Stack, useRouter, usePathname } from 'expo-router';
+import { AppHeader } from '@/components/AppHeader';
 import { colors, spacing, typography } from '@/lib/theme';
 
 const TABS = [
+  { name: 'Home', path: '/(app)/home', pathMatch: '/home', icon: '🏠' },
   { name: 'Dashboard', path: '/(app)/performer', pathMatch: '/performer', icon: '◉' },
   { name: 'Bookings', path: '/(app)/performer/bookings', pathMatch: '/performer/bookings', icon: '📅' },
   { name: 'Messages', path: '/(app)/performer/messages', pathMatch: '/performer/messages', icon: '💬' },
@@ -18,9 +20,11 @@ function TabBar() {
     <View style={styles.tabBar}>
       {TABS.map((tab) => {
         const isActive =
-          tab.pathMatch === '/performer'
-            ? !pathname.includes('bookings') && !pathname.includes('booking-detail') && !pathname.includes('messages') && !pathname.includes('conversation') && !pathname.includes('account') && !pathname.includes('profile')
-            : pathname.includes(tab.pathMatch) || (tab.pathMatch === '/performer/bookings' && pathname.includes('booking-detail')) || (tab.pathMatch === '/performer/messages' && pathname.includes('conversation'));
+          tab.pathMatch === '/home'
+            ? pathname === '/home' || pathname.startsWith('/home')
+            : tab.pathMatch === '/performer'
+              ? (pathname === '/performer' || pathname.startsWith('/performer/')) && !pathname.includes('bookings') && !pathname.includes('booking-detail') && !pathname.includes('messages') && !pathname.includes('conversation') && !pathname.includes('account') && !pathname.includes('profile')
+              : pathname.includes(tab.pathMatch) || (tab.pathMatch === '/performer/bookings' && pathname.includes('booking-detail')) || (tab.pathMatch === '/performer/messages' && pathname.includes('conversation'));
         return (
           <TouchableOpacity
             key={tab.path}
@@ -42,15 +46,18 @@ function TabBar() {
 export default function PerformerLayout() {
   return (
     <View style={styles.container}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="bookings" />
-        <Stack.Screen name="booking-detail" />
-        <Stack.Screen name="messages" />
-        <Stack.Screen name="conversation" />
-        <Stack.Screen name="account" />
-        <Stack.Screen name="profile" />
-      </Stack>
+      <AppHeader />
+      <View style={styles.stackWrap}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="bookings" />
+          <Stack.Screen name="booking-detail" />
+          <Stack.Screen name="messages" />
+          <Stack.Screen name="conversation" />
+          <Stack.Screen name="account" />
+          <Stack.Screen name="profile" />
+        </Stack>
+      </View>
       <TabBar />
     </View>
   );
@@ -58,6 +65,7 @@ export default function PerformerLayout() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  stackWrap: { flex: 1 },
   tabBar: {
     flexDirection: 'row',
     borderTopWidth: 1,
