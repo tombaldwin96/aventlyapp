@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,15 +7,21 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch } from '@/lib/api';
 import type { DashboardData } from '@/lib/types';
 import { colors, spacing, typography, borderRadius } from '@/lib/theme';
 import { useFocusEffect } from 'expo-router';
+import { PerformerOnboardingModal } from '@/components/PerformerOnboardingModal';
+
+const APPROVED_BANNER_DISMISSED_KEY = 'avently_performer_approved_banner_dismissed';
 
 const STATUS_CONFIG = {
   DRAFT: {
@@ -57,6 +63,30 @@ export default function PerformerDashboard() {
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [approvedBannerDismissed, setApprovedBannerDismissed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const v = await AsyncStorage.getItem(APPROVED_BANNER_DISMISSED_KEY);
+        if (!cancelled) setApprovedBannerDismissed(v === 'true');
+      } catch {
+        // AsyncStorage unavailable (e.g. native module null on web/simulator)
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  const dismissApprovedBanner = useCallback(() => {
+    setApprovedBannerDismissed(true);
+    try {
+      AsyncStorage.setItem(APPROVED_BANNER_DISMISSED_KEY, 'true').catch(() => {});
+    } catch {
+      // AsyncStorage unavailable
+    }
+  }, []);
 
   const fetchDashboard = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -94,10 +124,16 @@ export default function PerformerDashboard() {
 
   const statusKey = (data?.applicationStatus ?? 'DRAFT') as keyof typeof STATUS_CONFIG;
   const statusConfig = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG.DRAFT;
+  const showOnboarding = statusKey === 'DRAFT';
 
   return (
+    <>
+      <PerformerOnboardingModal
+        visible={showOnboarding}
+        onComplete={() => fetchDashboard()}
+      />
     <ScrollView
-      style={[styles.container, { paddingTop: insets.top }]}
+      style={styles.container}
       contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl + 80 }]}
       showsVerticalScrollIndicator={false}
       refreshControl={
@@ -106,11 +142,12 @@ export default function PerformerDashboard() {
     >
       {/* Welcome */}
       <View style={styles.welcome}>
+        <Text style={styles.welcomeLabel}>Dashboard</Text>
         <Text style={styles.welcomeTitle}>
-          Welcome, {data?.user?.name ?? user?.name ?? user?.email?.split('@')[0] ?? 'there'}
+          {data?.user?.name ?? user?.name ?? user?.email?.split('@')[0] ?? 'there'}
         </Text>
         <Text style={styles.subtitle}>
-          Here's your performer hub. Manage your profile, availability and bookings.
+          Manage your profile, availability and bookings.
         </Text>
       </View>
 
@@ -129,27 +166,52 @@ export default function PerformerDashboard() {
         </View>
       )}
 
-      {/* Status banner */}
-      <View style={[styles.statusBanner, { backgroundColor: statusConfig.bg, borderLeftColor: statusConfig.border }]}>
-        <View style={styles.statusRow}>
-          <View style={[styles.statusDot, { backgroundColor: statusConfig.border }]} />
-          <View style={styles.statusTextBlock}>
-            <Text style={[styles.statusLabel, { color: statusConfig.text }]}>{statusConfig.label}</Text>
-            <Text style={styles.statusDescription}>{statusConfig.description}</Text>
+      {/* Status banner (hide approved banner once dismissed forever) */}
+      {(statusKey !== 'APPROVED' || !approvedBannerDismissed) && (
+        <View
+          style={[
+            styles.statusBanner,
+            statusKey === 'APPROVED' && styles.statusBannerCompact,
+            { backgroundColor: statusConfig.bg, borderLeftColor: statusConfig.border },
+          ]}
+        >
+          <View style={styles.statusRow}>
+            <View style={[styles.statusDot, { backgroundColor: statusConfig.border }]} />
+            <View style={styles.statusTextBlock}>
+              <Text style={[styles.statusLabel, statusKey === 'APPROVED' && styles.statusLabelCompact, { color: statusConfig.text }]}>
+                {statusConfig.label}
+              </Text>
+              <Text style={[styles.statusDescription, statusKey === 'APPROVED' && styles.statusDescriptionCompact]}>
+                {statusConfig.description}
+              </Text>
+            </View>
+            {statusKey === 'APPROVED' && (
+              <TouchableOpacity
+                onPress={dismissApprovedBanner}
+                style={styles.statusDismiss}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityLabel="Dismiss"
+              >
+                <Text style={[styles.statusDismissText, { color: statusConfig.text }]}>×</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
-      </View>
+      )}
 
       {/* New booking request */}
       {data && data.pendingBookingCount > 0 && (
         <TouchableOpacity
           style={styles.bookingRequestCard}
           onPress={() => router.push('/(app)/performer/bookings')}
-          activeOpacity={0.8}
+          activeOpacity={0.92}
         >
+          <View style={styles.bookingRequestIconWrap}>
+            <FontAwesome name="bell" size={20} color="#B45309" />
+          </View>
           <Text style={styles.bookingRequestTitle}>New booking request{data.pendingBookingCount === 1 ? '' : 's'}</Text>
           <Text style={styles.bookingRequestDesc}>
-            You have {data.pendingBookingCount} request{data.pendingBookingCount === 1 ? '' : 's'} waiting. Review and accept or decline.
+            {data.pendingBookingCount} request{data.pendingBookingCount === 1 ? '' : 's'} waiting. Review and respond.
           </Text>
           {data.pendingRequests[0] && (
             <Text style={styles.bookingRequestDetail}>
@@ -157,7 +219,7 @@ export default function PerformerDashboard() {
               {data.pendingRequests[0].eventDate ? ` · ${data.pendingRequests[0].eventDate}` : ''}
             </Text>
           )}
-          <Text style={styles.bookingRequestCta}>View requests & respond →</Text>
+          <Text style={styles.bookingRequestCta}>View requests</Text>
         </TouchableOpacity>
       )}
 
@@ -219,24 +281,26 @@ export default function PerformerDashboard() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Quick actions</Text>
         <View style={styles.quickActions}>
-          <TouchableOpacity
-            style={styles.quickActionCard}
-            onPress={() => router.push('/(app)/performer/account')}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.quickActionIcon}>⚙</Text>
-            <Text style={styles.quickActionTitle}>Account</Text>
-            <Text style={styles.quickActionDesc}>Update your name, phone and booking details.</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.quickActionCard}
-            onPress={() => router.push('/(app)/performer/messages')}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.quickActionIcon}>💬</Text>
-            <Text style={styles.quickActionTitle}>Messages</Text>
-            <Text style={styles.quickActionDesc}>View and reply to messages about your bookings.</Text>
-          </TouchableOpacity>
+          {[
+            { path: '/(app)/performer/account', icon: 'cog' as const, title: 'Account', desc: 'Name, phone & booking details' },
+            { path: '/(app)/performer/messages', icon: 'envelope' as const, title: 'Messages', desc: 'Chat about your bookings' },
+            { path: '/(app)/performer/earnings', icon: 'gbp' as const, title: 'Earnings', desc: 'Track income from performances' },
+            { path: '/(app)/performer/shortlist', icon: 'star' as const, title: 'Shortlist', desc: 'Saved performers' },
+            { path: '/(app)/performer/reviews', icon: 'comment' as const, title: 'Reviews', desc: 'From customers & your own' },
+          ].map((item) => (
+            <TouchableOpacity
+              key={item.path}
+              style={styles.quickActionCard}
+              onPress={() => router.push(item.path as any)}
+              activeOpacity={0.92}
+            >
+              <View style={styles.quickActionIconWrap}>
+                <FontAwesome name={item.icon} size={20} color={colors.primary} />
+              </View>
+              <Text style={styles.quickActionTitle}>{item.title}</Text>
+              <Text style={styles.quickActionDesc}>{item.desc}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
       </View>
 
@@ -279,129 +343,179 @@ export default function PerformerDashboard() {
         </View>
       </View>
     </ScrollView>
+    </>
   );
 }
 
+const CARD_RADIUS = 20;
+const CARD_SHADOW = Platform.select({
+  ios: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+  },
+  android: { elevation: 3 },
+});
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, maxWidth: 480, alignSelf: 'center', width: '100%' },
+  container: { flex: 1, backgroundColor: '#F2F2F7' },
+  content: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.lg,
+    maxWidth: 480,
+    alignSelf: 'center',
+    width: '100%',
+  },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md },
   mutedText: { ...typography.bodySmall, color: colors.mutedForeground },
-  welcome: { marginBottom: spacing.lg },
-  welcomeTitle: { ...typography.title, color: colors.foreground, marginBottom: spacing.xs },
-  subtitle: { ...typography.bodySmall, color: colors.mutedForeground },
-  errorBanner: {
-    backgroundColor: '#FEE2E2',
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    marginBottom: spacing.md,
+  welcome: { marginBottom: spacing.xl },
+  welcomeLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.mutedForeground,
+    letterSpacing: 0.2,
+    marginBottom: 4,
   },
-  errorText: { color: '#B91C1C', fontSize: 14 },
-  managedBy: {
-    backgroundColor: colors.muted,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
+  welcomeTitle: { fontSize: 28, fontWeight: '700', color: colors.foreground, marginBottom: spacing.xs, letterSpacing: -0.5 },
+  subtitle: { fontSize: 15, color: colors.mutedForeground, lineHeight: 22 },
+  errorBanner: {
+    backgroundColor: '#FFF5F5',
+    borderRadius: CARD_RADIUS,
+    padding: spacing.lg,
     marginBottom: spacing.md,
+    ...CARD_SHADOW,
+  },
+  errorText: { color: '#B91C1C', fontSize: 15 },
+  managedBy: {
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: CARD_RADIUS,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    ...CARD_SHADOW,
   },
   managedByText: { ...typography.bodySmall, color: colors.foreground },
   managedByBold: { fontWeight: '600' },
   statusBanner: {
-    borderRadius: borderRadius.lg,
+    borderRadius: CARD_RADIUS,
     borderLeftWidth: 4,
-    padding: spacing.md,
+    padding: spacing.lg,
     marginBottom: spacing.lg,
+    ...CARD_SHADOW,
+  },
+  statusBannerCompact: {
+    paddingVertical: spacing.sm + 4,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
   },
   statusRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   statusDot: { width: 8, height: 8, borderRadius: 4, marginTop: 6 },
   statusTextBlock: { flex: 1 },
-  statusLabel: { ...typography.headline, marginBottom: 2 },
+  statusLabel: { fontSize: 17, fontWeight: '600', marginBottom: 2 },
+  statusLabelCompact: { fontSize: 17, marginBottom: 1 },
   statusDescription: { ...typography.bodySmall, color: colors.mutedForeground },
+  statusDescriptionCompact: { fontSize: 13, lineHeight: 18 },
+  statusDismiss: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -2,
+    marginRight: -4,
+  },
+  statusDismissText: { fontSize: 22, fontWeight: '300', lineHeight: 24 },
   bookingRequestCard: {
     backgroundColor: '#FFFBEB',
-    borderWidth: 1,
-    borderColor: '#F59E0B',
-    borderRadius: borderRadius.lg,
+    borderRadius: CARD_RADIUS,
     padding: spacing.lg,
     marginBottom: spacing.lg,
+    overflow: 'hidden',
+    ...CARD_SHADOW,
   },
-  bookingRequestTitle: { ...typography.headline, color: colors.foreground, marginBottom: spacing.xs },
-  bookingRequestDesc: { ...typography.bodySmall, color: colors.mutedForeground, marginBottom: spacing.sm },
-  bookingRequestDetail: { ...typography.bodySmall, color: colors.foreground, marginBottom: spacing.sm },
-  bookingRequestCta: { ...typography.bodySmall, color: colors.primary, fontWeight: '600' },
+  bookingRequestIconWrap: { marginBottom: spacing.sm },
+  bookingRequestTitle: { fontSize: 17, fontWeight: '600', color: colors.foreground, marginBottom: 4 },
+  bookingRequestDesc: { fontSize: 15, color: colors.mutedForeground, marginBottom: spacing.sm },
+  bookingRequestDetail: { fontSize: 14, color: colors.foreground, marginBottom: spacing.sm },
+  bookingRequestCta: { fontSize: 15, fontWeight: '600', color: colors.primary },
   section: { marginBottom: spacing.xl },
-  sectionTitle: { ...typography.headline, color: colors.foreground, marginBottom: spacing.md },
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: colors.foreground,
+    marginBottom: spacing.md,
+    letterSpacing: -0.3,
+  },
   sectionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.md,
   },
-  viewAll: { ...typography.bodySmall, color: colors.primary, fontWeight: '600' },
+  viewAll: { fontSize: 15, fontWeight: '600', color: colors.primary },
   profileCard: {
     backgroundColor: colors.card,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: CARD_RADIUS,
     overflow: 'hidden',
     padding: spacing.lg,
+    ...CARD_SHADOW,
   },
-  profileImage: { width: '100%', aspectRatio: 16 / 10, borderRadius: borderRadius.md, marginBottom: spacing.md },
-  profileImagePlaceholder: { backgroundColor: colors.muted, justifyContent: 'center', alignItems: 'center' },
+  profileImage: { width: '100%', aspectRatio: 16 / 10, borderRadius: 12, marginBottom: spacing.md },
+  profileImagePlaceholder: { backgroundColor: '#E5E5EA', justifyContent: 'center', alignItems: 'center' },
   profileImagePlaceholderText: { fontSize: 48, color: colors.mutedForeground, fontWeight: '600' },
-  stageName: { ...typography.headline, color: colors.foreground, marginBottom: spacing.sm },
+  stageName: { fontSize: 20, fontWeight: '700', color: colors.foreground, marginBottom: spacing.sm },
   labels: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.sm },
-  labelPill: { backgroundColor: colors.muted, paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: borderRadius.full },
-  labelPillText: { ...typography.caption, color: colors.foreground },
-  profileMeta: { gap: 2, marginBottom: spacing.md },
-  profileMetaText: { ...typography.bodySmall, color: colors.mutedForeground },
+  labelPill: { backgroundColor: '#E5E5EA', paddingHorizontal: spacing.sm + 2, paddingVertical: 6, borderRadius: borderRadius.full },
+  labelPillText: { ...typography.caption, color: colors.foreground, fontWeight: '500' },
+  profileMeta: { gap: 4, marginBottom: spacing.md },
+  profileMetaText: { fontSize: 14, color: colors.mutedForeground },
   editProfileBtn: {
     backgroundColor: colors.primary,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm + 4,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 12,
     alignSelf: 'flex-start',
   },
-  editProfileBtnText: { ...typography.bodySmall, color: colors.primaryForeground, fontWeight: '600' },
+  editProfileBtnText: { fontSize: 15, fontWeight: '600', color: colors.primaryForeground },
   quickActions: { flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap' },
   quickActionCard: {
     flex: 1,
     minWidth: 140,
     backgroundColor: colors.card,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: CARD_RADIUS,
     padding: spacing.lg,
+    ...CARD_SHADOW,
   },
-  quickActionIcon: { fontSize: 24, marginBottom: spacing.sm },
-  quickActionTitle: { ...typography.headline, color: colors.foreground, marginBottom: spacing.xs },
-  quickActionDesc: { ...typography.bodySmall, color: colors.mutedForeground },
+  quickActionIconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
+  quickActionTitle: { fontSize: 17, fontWeight: '600', color: colors.foreground, marginBottom: 4 },
+  quickActionDesc: { fontSize: 13, color: colors.mutedForeground, lineHeight: 18 },
   bookingsCard: {
     backgroundColor: colors.card,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: CARD_RADIUS,
     overflow: 'hidden',
+    ...CARD_SHADOW,
   },
-  emptyBookings: { padding: spacing.xl, alignItems: 'center' },
-  emptyBookingsTitle: { ...typography.headline, color: colors.foreground, marginBottom: spacing.xs },
-  emptyBookingsDesc: { ...typography.bodySmall, color: colors.mutedForeground },
+  emptyBookings: { padding: spacing.xl * 1.5, alignItems: 'center' },
+  emptyBookingsTitle: { fontSize: 17, fontWeight: '600', color: colors.foreground, marginBottom: spacing.xs },
+  emptyBookingsDesc: { fontSize: 15, color: colors.mutedForeground },
   bookingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: spacing.md,
-    borderBottomWidth: 1,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
   bookingRowMain: { flex: 1 },
-  bookingCustomer: { ...typography.body, color: colors.foreground, fontWeight: '600' },
-  bookingEvent: { ...typography.bodySmall, color: colors.mutedForeground },
+  bookingCustomer: { fontSize: 16, fontWeight: '600', color: colors.foreground },
+  bookingEvent: { fontSize: 14, color: colors.mutedForeground, marginTop: 2 },
   bookingBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: borderRadius.sm,
-    backgroundColor: colors.muted,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#E5E5EA',
   },
   bookingBadgePending: { backgroundColor: '#FEF3C7' },
-  bookingBadgeText: { ...typography.caption, color: colors.foreground },
+  bookingBadgeText: { fontSize: 12, fontWeight: '600', color: colors.foreground },
 });

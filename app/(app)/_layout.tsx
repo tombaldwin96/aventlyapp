@@ -9,7 +9,10 @@ export default function AppLayout() {
   const redirected = useRef(false);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      router.replace('/(auth)/login');
+      return;
+    }
     const sub = segments[1];
     if (sub === 'home') return; // Home is the app homepage; allow all roles to stay on it
     let target: string | null = null;

@@ -145,8 +145,8 @@ const styles = StyleSheet.create({
     paddingRight: spacing.sm,
   },
   logo: {
-    width: 112,
-    height: 22,
+    width: 238,
+    height: 47,
   },
   titleWrap: {
     flex: 1,

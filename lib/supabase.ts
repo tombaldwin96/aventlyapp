@@ -104,5 +104,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+    // Session persists until user explicitly signs out (storage holds refresh token).
   },
 });

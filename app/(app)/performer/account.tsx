@@ -10,16 +10,19 @@ import {
   Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, deleteAccount } from '@/lib/api';
 import { colors, spacing, typography, borderRadius } from '@/lib/theme';
 
 export default function PerformerAccount() {
   const insets = useSafeAreaInsets();
-  const { user, refreshProfile } = useAuth();
+  const router = useRouter();
+  const { user, refreshProfile, signOut } = useAuth();
   const [name, setName] = useState(user?.name ?? '');
   const [phone, setPhone] = useState(user?.phone ?? '');
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   React.useEffect(() => {
     setName(user?.name ?? '');
@@ -39,6 +42,48 @@ export default function PerformerAccount() {
     } else {
       Alert.alert('Error', res.error ?? 'Could not save');
     }
+  };
+
+  const handleSignOut = () => {
+    Alert.alert(
+      'Sign out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Yes, sign out',
+          style: 'destructive',
+          onPress: () => {
+            signOut().then(() => router.replace('/(auth)/login'));
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete my account',
+      'This will permanently delete your account and all associated data. This cannot be undone. Are you sure?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete my account',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            const res = await deleteAccount();
+            setDeleting(false);
+            if (res.error) {
+              Alert.alert(res.status === 404 ? 'Not available' : 'Error', res.error);
+              return;
+            }
+            await signOut();
+            router.replace('/(auth)/login');
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -76,6 +121,21 @@ export default function PerformerAccount() {
           {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save changes</Text>}
         </TouchableOpacity>
       </View>
+      <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut} activeOpacity={0.8}>
+        <Text style={styles.signOutBtnText}>Sign out</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.deleteAccountBtn}
+        onPress={handleDeleteAccount}
+        disabled={deleting}
+        activeOpacity={0.8}
+      >
+        {deleting ? (
+          <ActivityIndicator size="small" color={colors.mutedForeground} />
+        ) : (
+          <Text style={styles.deleteAccountBtnText}>Delete my account</Text>
+        )}
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -112,4 +172,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   saveBtnText: { ...typography.body, fontWeight: '600', color: colors.primaryForeground },
+  signOutBtn: {
+    marginTop: spacing.xl,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: spacing.xl,
+  },
+  signOutBtnText: { ...typography.body, fontWeight: '600', color: colors.destructive },
+  deleteAccountBtn: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  deleteAccountBtnText: { ...typography.body, fontWeight: '600', color: colors.mutedForeground },
 });

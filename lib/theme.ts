@@ -1,16 +1,15 @@
 /**
- * Avently theme: matches website (header blue, primary, amber search bar).
- * Primary: #006BB3, Header: #003580, Search bar border: #febb02 (website hero search).
+ * Avently theme: primary purple #571E8F, header/footer, amber search bar.
  */
 export const colors = {
-  primary: '#006BB3',
-  primaryDark: '#003580',
+  primary: '#571E8F',
+  primaryDark: '#451a73',
   primaryForeground: '#FFFFFF',
-  /** Hero and header background (same as website). */
-  headerBg: '#003580',
+  /** Hero and header background. */
+  headerBg: '#571E8F',
   /** Footer background. */
-  footerBg: '#002855',
-  /** Hero search bar border (website amber). */
+  footerBg: '#3d1766',
+  /** Hero search bar border (amber). */
   searchBarBorder: '#febb02',
   searchBarBorderMuted: '#fcd34d',
   background: '#F7F9FC',
@@ -22,8 +21,8 @@ export const colors = {
   border: '#E2E8F0',
   input: '#E2E8F0',
   destructive: '#DC2626',
-  accent: '#E0F2FE',
-  accentForeground: '#006BB3',
+  accent: '#F3E8FF',
+  accentForeground: '#571E8F',
 } as const;
 
 export const spacing = {

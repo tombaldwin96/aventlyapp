@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, Platform, ActivityIndicator } from 'react-native';
 import { useRouter, Link } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@/contexts/AuthContext';
-import { getApiBaseUrl, getAccessToken } from '@/lib/api';
+import { getApiBaseUrl, getAccessToken, apiFetch, deleteAccount } from '@/lib/api';
 import { colors, spacing, typography } from '@/lib/theme';
 
 export default function ProfileTab() {
@@ -11,6 +11,32 @@ export default function ProfileTab() {
   const router = useRouter();
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete my account',
+      'This will permanently delete your account and all associated data. This cannot be undone. Are you sure?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete my account',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            const res = await deleteAccount();
+            setDeleting(false);
+            if (res.error) {
+              Alert.alert(res.status === 404 ? 'Not available' : 'Error', res.error);
+              return;
+            }
+            await signOut();
+            router.replace('/(auth)/login');
+          },
+        },
+      ]
+    );
+  };
 
   const pickAndUploadPhoto = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -96,8 +122,19 @@ export default function ProfileTab() {
           </TouchableOpacity>
         </Link>
       )}
-      <TouchableOpacity style={styles.button} onPress={() => signOut().then(() => router.replace('/'))}>
+      <TouchableOpacity style={styles.button} onPress={() => signOut().then(() => router.replace('/(auth)/login'))}>
         <Text style={styles.buttonText}>Sign out</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.deleteButton}
+        onPress={handleDeleteAccount}
+        disabled={deleting}
+      >
+        {deleting ? (
+          <ActivityIndicator size="small" color={colors.mutedForeground} />
+        ) : (
+          <Text style={styles.deleteButtonText}>Delete my account</Text>
+        )}
       </TouchableOpacity>
     </ScrollView>
   );
@@ -135,6 +172,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  deleteButton: {
+    marginTop: spacing.md,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  deleteButtonText: { fontSize: 16, fontWeight: '600', color: colors.mutedForeground },
   devLink: { marginBottom: spacing.md },
   linkText: { color: colors.primary, fontSize: 14 },
 });

@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, getSignupInProgress } from '@/lib/api';
 import type { AppUser } from '@/lib/types';
 
 interface AuthContextValue {
@@ -48,7 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (mounted.current) setUser(profile);
   }, []);
 
-  // Restore session from persistent storage (SecureStore/AsyncStorage). User stays logged in until they sign out.
+  // Restore session from persistent storage. Force persistent login: user stays logged in until they explicitly sign out.
   useEffect(() => {
     mounted.current = true;
     let cancelled = false;
@@ -78,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [fetchProfile]);
 
-  // Only clear user on explicit SIGNED_OUT (e.g. user tapped Sign out). Token refresh keeps session alive.
+  // Only clear user on explicit SIGNED_OUT (user chose to log out). Never clear on token expiry or other events; token refresh keeps session alive.
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT') {
@@ -89,6 +89,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('[Auth] Token refreshed');
       }
       if (session && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED')) {
+        if (getSignupInProgress()) {
+          return;
+        }
         const profile = await fetchProfile();
         if (mounted.current) setUser(profile);
       }
