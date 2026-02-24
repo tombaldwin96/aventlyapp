@@ -49,7 +49,7 @@ export function PreloadScreen({
     <View style={styles.container}>
       <Animated.View style={[styles.logoWrap, logoStyle]}>
         <Image
-          source={require('@/assets/images/icon.png')}
+          source={require('@/assets/images/logo.png')}
           style={styles.logo}
           resizeMode="contain"
           accessibilityLabel="Avently logo"
