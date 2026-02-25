@@ -15,6 +15,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '@/contexts/AuthContext';
+import { setVisitedAvailabilityTab as setVisitedAvailabilitySession } from '@/lib/performer-session-flags';
 import {
   format,
   startOfMonth,
@@ -62,8 +65,10 @@ type Defaults = {
 };
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const VISITED_AVAILABILITY_KEY_PREFIX = 'avently_performer_visited_availability_';
 
 export default function AvailabilityScreen() {
+  const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const [viewDate, setViewDate] = useState(() => new Date());
   const [defaults, setDefaults] = useState<Defaults | null>(null);
@@ -78,6 +83,15 @@ export default function AvailabilityScreen() {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const monthKey = format(viewDate, 'yyyy-MM');
+
+  useFocusEffect(
+    useCallback(() => {
+      setVisitedAvailabilitySession();
+      if (user?.id) {
+        AsyncStorage.setItem(`${VISITED_AVAILABILITY_KEY_PREFIX}${user.id}`, 'true').catch(() => {});
+      }
+    }, [user?.id])
+  );
 
   const fetchDefaults = useCallback(async () => {
     const { data } = await apiFetch<Defaults>('/api/performers/availability/defaults');

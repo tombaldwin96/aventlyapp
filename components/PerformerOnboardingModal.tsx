@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,9 @@ import {
   Platform,
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
-import { apiFetch } from '@/lib/api';
+import { getApiBaseUrl } from '@/lib/api';
 import { fetchPublic } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import { colors, spacing, typography, borderRadius } from '@/lib/theme';
 
 type TaxonomyItem = { slug: string; name: string };
@@ -28,6 +29,7 @@ const STEPS = ['About you', 'Your professions & events', 'Pricing'];
 
 export function PerformerOnboardingModal({ visible, onComplete, onDismiss }: Props) {
   const { user } = useAuth();
+  const scrollRef = useRef<ScrollView>(null);
   const [step, setStep] = useState(0);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,8 +39,8 @@ export function PerformerOnboardingModal({ visible, onComplete, onDismiss }: Pro
   const [taxonomyLoading, setTaxonomyLoading] = useState(true);
 
   const nameParts = (user?.name ?? '').trim().split(/\s+/);
-  const [firstName, setFirstName] = useState(nameParts[0] ?? '');
-  const [lastName, setLastName] = useState(nameParts.slice(1).join(' ') ?? '');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState(nameParts.length > 1 ? nameParts.slice(1).join(' ') : '');
   const [stageName, setStageName] = useState('');
   const [phone, setPhone] = useState('');
   const [baseAddressLine1, setBaseAddressLine1] = useState('');
@@ -99,6 +101,10 @@ export function PerformerOnboardingModal({ visible, onComplete, onDismiss }: Pro
     return true;
   }, [step, firstName, lastName, stageName, basePostcode, contractorTermsAccepted, selectedPerformerTypes, selectedEventTypes, weekdayPence, weekendPence]);
 
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  }, [step]);
+
   const handleNext = useCallback(() => {
     setError(null);
     if (step < STEPS.length - 1) setStep((s) => s + 1);
@@ -112,41 +118,77 @@ export function PerformerOnboardingModal({ visible, onComplete, onDismiss }: Pro
   const handleSubmit = useCallback(async () => {
     setError(null);
     setSubmitLoading(true);
+    const base = getApiBaseUrl();
+    if (!base) {
+      setSubmitLoading(false);
+      setError('API URL not configured. Set EXPO_PUBLIC_APP_URL.');
+      return;
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token?.trim();
+    if (!token) {
+      setSubmitLoading(false);
+      setError('Not signed in. Please sign out and sign in again.');
+      return;
+    }
     const travel = Math.max(1, Math.min(500, Math.round(Number(travelRadiusMiles) || 30)));
     const lead = Math.max(0, Math.round(Number(minLeadTimeDays) ?? 1));
-    const weekday = Math.max(0, Math.round(Number(weekdayPence) || 0) * 100);
-    const weekend = Math.max(0, Math.round(Number(weekendPence) || 0) * 100);
+    const weekdayPenceNum = Math.max(0, Math.round(Number(weekdayPence) || 0) * 100);
+    const weekendPenceNum = Math.max(0, Math.round(Number(weekendPence) || 0) * 100);
+    const body = {
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      stageName: stageName.trim(),
+      email: user?.email ?? undefined,
+      phone: phone.trim() || undefined,
+      baseAddressLine1: baseAddressLine1.trim() || undefined,
+      basePostcode: basePostcode.trim(),
+      contractorTermsAccepted: true,
+      performerTypes: selectedPerformerTypes,
+      eventTypesAccepted: selectedEventTypes,
+      travelRadiusMiles: travel,
+      minLeadTimeDays: lead,
+      defaultPrices: { weekdayPence: weekdayPenceNum, weekendPence: weekendPenceNum },
+      managementCode: managementCode.trim() || undefined,
+    };
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     try {
-      const res = await apiFetch<{ ok?: boolean }>('/api/performers/apply', {
+      const res = await fetch(`${base}/api/performers/apply`, {
         method: 'POST',
-        body: JSON.stringify({
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
-          stageName: stageName.trim(),
-          basePostcode: basePostcode.trim(),
-          phone: phone.trim() || undefined,
-          baseAddressLine1: baseAddressLine1.trim() || undefined,
-          managementCode: managementCode.trim() || undefined,
-          contractorTermsAccepted: true,
-          performerTypes: selectedPerformerTypes,
-          eventTypesAccepted: selectedEventTypes,
-          travelRadiusMiles: travel,
-          minLeadTimeDays: lead,
-          defaultPrices: { weekdayPence: weekday, weekendPence: weekend },
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'X-Access-Token': token,
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
       });
-      if (res.error || !res.data?.ok) {
-        setError(res.error ?? 'Submission failed');
-        setSubmitLoading(false);
+      clearTimeout(timeoutId);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg =
+          res.status === 401
+            ? "Your account isn't set up as a performer. Please sign out and create a performer account."
+            : res.status === 504
+              ? 'Server took too long to respond. Please try again.'
+              : (data as { error?: string }).error ?? `Request failed (${res.status})`;
+        setError(msg);
         return;
       }
-      setSubmitLoading(false);
       onComplete();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Submission failed');
+      clearTimeout(timeoutId);
+      if (e instanceof Error && e.name === 'AbortError') {
+        setError('Request timed out. Check your connection and try again.');
+      } else {
+        setError(e instanceof Error ? e.message : 'Submission failed');
+      }
+    } finally {
       setSubmitLoading(false);
     }
   }, [
+    user?.email,
     firstName,
     lastName,
     stageName,
@@ -204,6 +246,7 @@ export function PerformerOnboardingModal({ visible, onComplete, onDismiss }: Pro
         </View>
 
         <ScrollView
+          ref={scrollRef}
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
@@ -344,6 +387,9 @@ export function PerformerOnboardingModal({ visible, onComplete, onDismiss }: Pro
                     })}
                   </View>
                   <Text style={styles.label}>Travel radius (miles)</Text>
+                  <Text style={styles.hint}>
+                    How far from your base postcode you're willing to travel for bookings.
+                  </Text>
                   <TextInput
                     style={styles.input}
                     value={travelRadiusMiles}
@@ -387,8 +433,9 @@ export function PerformerOnboardingModal({ visible, onComplete, onDismiss }: Pro
                 keyboardType="decimal-pad"
               />
               <Text style={styles.hint}>
-                These figures will be your default price. This can be changed later. Add at least
-                one price; you can add more packages and set availability after approval.
+                Prices are for a standard 4-hour set. For bookings longer than 4 hours, we use
+                this rate to calculate your hourly fee and add it to the booking. You can change
+                these defaults later and add more packages after approval.
               </Text>
             </View>
           )}
@@ -486,6 +533,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm + 4,
     fontSize: 16,
     color: colors.foreground,
+    letterSpacing: 0,
     marginBottom: spacing.md,
   },
   checkRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm, marginBottom: spacing.md },

@@ -25,6 +25,7 @@ export interface AuthState {
 export interface DashboardData {
   user: { id: string; name: string | null; role: string };
   applicationStatus: 'DRAFT' | 'PENDING_REVIEW' | 'APPROVED';
+  hasSetAvailability?: boolean;
   pendingBookingCount: number;
   pendingRequests: Array<{
     id: string;

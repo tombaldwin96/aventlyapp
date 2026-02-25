@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, Platform, ActivityIndicator } from 'react-native';
 import { useRouter, Link } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useAuth } from '@/contexts/AuthContext';
 import { getApiBaseUrl, getAccessToken, apiFetch, deleteAccount } from '@/lib/api';
-import { colors, spacing, typography } from '@/lib/theme';
+import { colors, spacing, typography, borderRadius } from '@/lib/theme';
 
 export default function ProfileTab() {
   const { user, signOut, refreshProfile } = useAuth();
@@ -41,7 +42,7 @@ export default function ProfileTab() {
   const pickAndUploadPhoto = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Allow access to your photos to upload a profile photo.');
+      Alert.alert('Permission needed', 'Please allow access to pictures to continue upload.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -92,14 +93,31 @@ export default function ProfileTab() {
       <Text style={styles.title}>Account</Text>
       {user && (
         <View style={styles.card}>
-          {(photoUrl || user.performerProfile?.profileImageUrl) ? (
-            <Image
-              source={{ uri: photoUrl ?? (user.performerProfile as { profileImageUrl?: string } | null)?.profileImageUrl ?? '' }}
-              style={styles.avatar}
-            />
-          ) : (
-            <View style={styles.avatarPlaceholder} />
-          )}
+          <TouchableOpacity
+            onPress={pickAndUploadPhoto}
+            disabled={uploading}
+            activeOpacity={0.8}
+            style={styles.avatarTouchable}
+          >
+            {(photoUrl || (user.performerProfile as { profileImageUrl?: string } | null)?.profileImageUrl) ? (
+              <Image
+                source={{ uri: photoUrl ?? (user.performerProfile as { profileImageUrl?: string } | null)?.profileImageUrl ?? '' }}
+                style={styles.avatar}
+              />
+            ) : (
+              <View style={styles.avatarPlaceholder} />
+            )}
+            {uploading && (
+              <View style={styles.avatarOverlay}>
+                <ActivityIndicator size="small" color="#fff" />
+              </View>
+            )}
+            {!uploading && (
+              <View style={styles.avatarEditBadge}>
+                <FontAwesome name="camera" size={16} color="#fff" />
+              </View>
+            )}
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.uploadButton, uploading && styles.buttonDisabled]}
             onPress={pickAndUploadPhoto}
@@ -152,8 +170,40 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  avatar: { width: 80, height: 80, borderRadius: 40, marginBottom: spacing.md },
-  avatarPlaceholder: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.muted, marginBottom: spacing.md },
+  avatarTouchable: { marginBottom: spacing.md, alignSelf: 'flex-start' },
+  avatar: { width: 80, height: 80, borderRadius: 40 },
+  avatarPlaceholder: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.muted },
+  avatarOverlay: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 40,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    height: 80,
+  },
+  avatarEditBadge: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
   uploadButton: {
     backgroundColor: colors.primary,
     borderRadius: 8,

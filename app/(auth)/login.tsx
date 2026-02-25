@@ -208,7 +208,7 @@ export default function LoginScreen() {
       setUserFromLogin(profile);
       setPendingSignupRole(null);
       setSignupInProgress(false);
-      router.replace(getRedirectForRole(profile.role));
+      router.replace(getRedirectForRole(profile.role) as import('expo-router').Href);
     } catch (e: unknown) {
       setPendingSignupRole(null);
       setSignupInProgress(false);

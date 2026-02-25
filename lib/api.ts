@@ -29,9 +29,21 @@ export function getApiBaseUrl(): string {
   return url.replace(/\/$/, '');
 }
 
+const SESSION_TIMEOUT_MS = 8000;
+
 export async function getAccessToken(): Promise<string | null> {
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.access_token ?? null;
+  try {
+    const sessionPromise = supabase.auth.getSession();
+    const session = await Promise.race([
+      sessionPromise.then(({ data: { session } }) => session),
+      new Promise<null>((_, reject) =>
+        setTimeout(() => reject(new Error('Session timeout')), SESSION_TIMEOUT_MS)
+      ),
+    ]);
+    return session?.access_token ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** Public GET (no auth). For taxonomy, search, etc. */

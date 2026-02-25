@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Image, Platform, useWindowDimensions } from 'react-native';
+import { View, StyleSheet, Image, Platform, type ViewStyle, type ImageStyle } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -59,7 +59,7 @@ export function PreloadScreen({
     return () => clearTimeout(t);
   }, [started, logoOpacity, logoScale, glitchX, onFinish]);
 
-  const logoStyle = useAnimatedStyle(() => ({
+  const logoStyle = useAnimatedStyle<ViewStyle>(() => ({
     opacity: logoOpacity.value,
     transform: [
       { scale: logoScale.value },
@@ -68,12 +68,12 @@ export function PreloadScreen({
   }));
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container as ViewStyle}>
       <View style={styles.centered}>
         <Animated.View style={[styles.logoWrap, logoStyle]}>
           <Image
             source={require('@/assets/images/logo.png')}
-            style={styles.logo}
+            style={styles.logo as ImageStyle}
             resizeMode="contain"
             accessibilityLabel="Avently logo"
           />
@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryDark,
     justifyContent: 'center',
     alignItems: 'center',
-    ...Platform.select({ web: { minHeight: '100vh' } }),
+    ...Platform.select({ web: { minHeight: '100vh' as unknown as number } }),
   },
   centered: {
     alignItems: 'center',

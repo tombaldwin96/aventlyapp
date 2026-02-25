@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { PreloadScreen } from '@/components/PreloadScreen';
 
@@ -16,12 +16,12 @@ export default function PreloadRoute() {
     if (!done) return;
     navigated.current = true;
     if (user) {
-      if (user.role === 'ADMIN') router.replace('/(app)/admin');
-      else if (user.role === 'PERFORMER') router.replace('/(app)/performer');
-      else if (user.role === 'BUSINESS') router.replace('/(app)/business');
-      else router.replace('/(app)');
+      if (user.role === 'ADMIN') router.replace('/(app)/admin' as Href);
+      else if (user.role === 'PERFORMER') router.replace('/(app)/performer' as Href);
+      else if (user.role === 'BUSINESS') router.replace('/(app)/business' as Href);
+      else router.replace('/(app)' as Href);
     } else {
-      router.replace('/(auth)/login');
+      router.replace('/(auth)/login' as Href);
     }
   }, [preloadDone, isRestoring, isLoading, user, router]);
 
